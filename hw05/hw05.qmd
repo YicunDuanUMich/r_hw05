@@ -1,0 +1,601 @@
+---
+title: "Problem Set 5"
+format: 
+  html:
+    embed-resources: true
+    toc: true
+    toc-location: right
+    toc-title: "Content"
+editor: visual
+---
+
+## About this file
+
+This is the Yicun Duan's (umich id: 62178151) report of STAT 506's Problem Set 5. Here is the link to my [GitHub repository](https://github.com/YicunDuanUMich/r_hw05).
+
+## Problem 1 - Plotting
+
+### a
+
+We first preprocess the data to get the average temperature for each month in celsius.
+
+```{r}
+#| code-fold: show
+#| code-summary: "Preprocess data"
+#| warning: true
+#| error: true
+
+rm(list = ls())
+library(tidyverse)
+
+# Read data from csv and preprocess the variables.
+nnmaps <- read.csv("./data/chicago-nmmaps.csv")
+nnmaps$date <- as.Date(nnmaps$date)
+nnmaps$season <- factor(nnmaps$season, levels = c("Winter", "Spring",
+                                                     "Summer", "Autumn"))
+# Transfer data.frame to tibble.
+nnmaps <- as_tibble(nnmaps)
+
+# Calculate the average temperature/o3/dewpoint/pm10 by month.
+# Change the unit of temperature to celsius.
+nnmaps <- nnmaps %>%
+  group_by(month_numeric) %>%
+  summarise(temp_month_avg = mean(temp, na.rm = TRUE),
+            o3_month_avg = mean(o3, na.rm = TRUE),
+            dewpoint_month_avg = mean(dewpoint, na.rm = TRUE),
+            pm10_month_avg = mean(pm10, na.rm = TRUE),
+            season = unique(season)) %>%
+  ungroup() %>%
+  mutate(temp_month_avg = (temp_month_avg - 32) * (5 / 9))
+
+```
+
+We load the theme from this [link](https://rpubs.com/Koundy/71792) to make the plot publication-ready.
+
+```{r}
+#| code-fold: true
+#| code-summary: "Load the theme"
+#| warning: true
+#| error: true
+
+# code from https://rpubs.com/Koundy/71792
+
+# Define the theme.
+theme_for_pub <- function(base_size=10, base_family="helvetica") {
+      library(grid)
+      library(ggthemes)
+      (theme_foundation(base_size=base_size, base_family=base_family)
+       + theme(plot.title = element_text(face = "bold",
+                                         size = rel(1.2), hjust = 0.5),
+               text = element_text(),
+               panel.background = element_rect(colour = NA),
+               plot.background = element_rect(colour = NA),
+               panel.border = element_rect(colour = NA),
+               axis.title = element_text(face = "bold", size = rel(1)),
+               axis.title.y = element_text(angle=90, vjust =2),
+               axis.title.x = element_text(vjust = -0.2),
+               axis.text = element_text(), 
+               axis.line = element_line(colour = "black"),
+               axis.ticks = element_line(),
+               panel.grid.major = element_line(colour = "#f0f0f0"),
+               panel.grid.minor = element_blank(),
+               legend.key = element_rect(colour = NA),
+               legend.position = "bottom",
+               legend.direction = "horizontal",
+               legend.key.size= unit(0.2, "cm"),
+               legend.spacing = unit(0, "cm"),
+               legend.title = element_text(face="italic"),
+               plot.margin=unit(c(10,5,5,5),"mm"),
+               strip.background=element_rect(colour = "#f0f0f0",fill = "#f0f0f0"),
+               strip.text = element_text(face="bold")
+          ))
+      
+}
+
+# Define the fill color.
+scale_fill_for_pub <- function(...){
+      library(scales)
+      discrete_scale("fill", "Publication", 
+                     manual_pal(values = c("#386cb0", "#7fc97f", "#ef3b2c", "#fdb462","#662506","#a6cee3","#fb9a99","#984ea3","#ffff33")), ...)
+
+}
+
+# Define the color.
+scale_colour_for_pub <- function(...){
+      library(scales)
+      discrete_scale("colour", "Publication", 
+                     manual_pal(values = c("#386cb0", "#7fc97f", "#ef3b2c", "#fdb462","#662506","#a6cee3","#fb9a99","#984ea3","#ffff33")), ...)
+
+}
+
+```
+
+We use `ggplot` to show the monthly average temperature in celsius.
+
+```{r}
+#| code-fold: show
+#| code-summary: "Plot"
+#| warning: false
+#| error: true
+
+ggplot(data = nnmaps, 
+       mapping = aes(x = month_numeric, y = temp_month_avg, color = season)) +
+  geom_line(linewidth = 2) +
+  geom_point(shape = "*", size = 15) +
+  ggtitle("Monthly Avg Temp (Celsius) v.s. Month") +
+  scale_x_discrete(name = "Month", limits = factor(1:12)) +
+  scale_y_continuous(name = "Monthly Avg Temp (Celsius)") +
+  scale_colour_for_pub() + theme_for_pub() +
+  scale_color_discrete(name = "Seasons")
+
+```
+
+### b
+
+We pivot the data, and also change the names of data type (e.g., from `temp_month_avg` to `Temperature (Celsius)`) for the convenience of plotting.
+
+```{r}
+#| code-fold: show
+#| code-summary: "Preprocess data"
+#| warning: false
+#| error: true
+
+# Pivot longer and change the name.
+nnmaps <- nnmaps %>% pivot_longer(cols = temp_month_avg:pm10_month_avg,
+                        names_to = "type", values_to = "data") %>%
+          mutate(type = sapply(type, function(x) {
+                              switch(x,
+                                     temp_month_avg = "Temperature (Celsius)",
+                                     o3_month_avg = "O3",
+                                     dewpoint_month_avg = "Dewpoint",
+                                     pm10_month_avg = "PM10"
+                                     )
+            }))
+
+```
+
+In the following graph, we showcase the per month average Temperature/O3/PM10/Dewpoint. We use different point shapes and line shapes to distinguish the data types. Different colors are used to differ the seasons. As shown in the graph, `PM10` has the least seasonal trend.
+
+```{r}
+#| code-fold: show
+#| code-summary: "Plot"
+#| warning: false
+#| error: true
+
+ggplot(data = nnmaps, 
+        mapping = aes(x = month_numeric, y = data, color = season)) +
+        geom_line(mapping = aes(linetype = type), line_width = 4) +
+        geom_point(mapping = aes(shape = type)) +
+        ggtitle("Multiple Means (Temperature/O3/PM10/Dewpoint) v.s. Month") +
+        scale_x_discrete(name = "Month", limits = factor(1:12)) +
+        scale_y_continuous(name = "Monthly Mean Value")  +
+        scale_colour_for_pub() + theme_for_pub() +
+        guides(shape = guide_legend(nrow = 2, byrow = TRUE),
+               linetype = guide_legend(nrow = 2, byrow = TRUE),
+               color = guide_legend(nrow=2, byrow=TRUE)) +
+        scale_shape_discrete(name = "Data Types") +
+        scale_linetype(name = "Data Types") +
+        scale_color_discrete(name = "Seasons")
+
+```
+
+## Problem 2 - OOP Programming
+
+### a
+
+We first define the class and validator.
+
+```{r}
+#| code-fold: show
+#| code-summary: "Class and Validator"
+#| warning: true
+#| error: true
+
+rm(list = ls())
+
+# We define the `poly` class whose attribute is a `data.frame`.
+# This `data.frame` should contain two columns (`power` and `poly_coef`).
+# The column `power` stores the power of each term.
+# The column `poly_coef` stores the coefficient of each term.
+setClass("poly", 
+         slots = c(data = "data.frame"))
+
+
+#' The validator of the `poly` class.
+#' 
+#' It will check the column name of the `data.frame` in `poly`.
+#' It will also verify the data type and values.
+#'
+#' @param object the `poly` object
+#'
+#' @return whether the object is valid.
+setValidity("poly", function(object) {
+  # The `data.frame` should contain two columns (`power` and `poly_coef`).
+  # The column `power` stores the power of each term.
+  # The column `poly_coef` stores the coefficient of each term.
+  if (!all(c("power", "poly_coef") %in% colnames(object@data))) {
+    stop("The `data` of `poly` class should have columns `power` and `poly_coef`")
+  }
+  
+  # The column `power` and `poly_coef` should be numeric vectors.
+  if (!(is.numeric(object@data$power) && is.numeric(object@data$poly_coef))) {
+    stop("The `power` and `poly_coef` of `poly`'s `data` attribute should be numeric vectors.")
+  }
+  
+  # The column `power` should not contain NaN, NA and Inf.
+  if (any(is.nan(object@data$power) | 
+          is.na(object@data$power) | 
+          is.infinite(object@data$power))) {
+    stop("The `power` of `poly`'s `data` attribute contains `NaN`, `NA`, or `Inf`.")
+  }
+  
+  # The column `poly_coef` should not contain NaN, NA and Inf.
+  if (any(is.nan(object@data$poly_coef) | 
+          is.na(object@data$poly_coef) | 
+          is.infinite(object@data$poly_coef))) {
+    stop("The `poly_coef` of `poly`'s `data` attribute contains `NaN`, `NA`, or `Inf`.")
+  }
+  
+  # The column `power` should not contain repeated values.
+  if (length(unique(object@data$power)) != length(object@data$power)) {
+    stop("The `power` of `poly`'s `data` attribute contains repeated values.")
+  }
+  
+  return(TRUE)
+})
+
+```
+
+We define the constructor as follows:
+
+```{r}
+#| code-fold: show
+#| code-summary: "Constructor"
+#| warning: true
+#| error: true
+
+#' The constructor of `poly` class.
+#' 
+#' It takes a named numeric vector as input.
+#' The names of this vector should be like `x1`, `x4`, `x1.2`, `intercept`.
+#' The values of this vector refer to the coefficients of each term and
+#' can be any real number.
+#'
+#' @param poly_express a named numeric vector which represents the polynomial expression.
+make_poly <- function(poly_express) {
+  # Check whether the input is a named numeric vector.
+  if (!is.numeric(poly_express) || 
+      is.null(names(poly_express))
+      ) {
+    stop("The input `poly_express` should be a named numeric vector")
+  }
+  
+  # Store the names into `poly_names`, and check whether the names are valid.
+  poly_names <- names(poly_express)
+  if (!all(grepl("^[xX]", poly_names) | poly_names %in% "intercept")) {
+    stop("The input vector should have names like `x1`, `x1.2` and `intercept`.")
+  }
+  # If the name is `x`, we treat it as `x1`.
+  if ("x" %in% poly_names) {
+    poly_names[which(poly_names %in% "x")] <- "x1"
+  }
+  # If the name is `intercept`, we treat it as `x0`.
+  if ("intercept" %in% poly_names) {
+    poly_names[which(poly_names %in% "intercept")] <- "x0"
+  }
+  
+  # Drop the first character of the names.
+  poly_names_trunc <- sapply(poly_names, function(x) {
+    return(substr(x, 2, nchar(x)))
+  })
+  
+  # Check whether the powers are valid numbers.
+  if (any(is.na(
+    suppressWarnings(
+      as.numeric(poly_names_trunc)
+      )
+    ))) {
+    stop("The input vector should have names like `x1`, `x1.2` and `intercept`.")
+  }
+  
+  # Get the power of each term.
+  poly_names_val <- as.numeric(poly_names_trunc)
+  # Get the coefficient of each term.
+  poly_coef <- unname(poly_express)
+  # Create a `data.frame` to store the powers and coefficients.
+  poly_data_frame <- data.frame(power = poly_names_val, 
+                                poly_coef = poly_coef)
+  # Combine the coefficients of the terms with same power.
+  poly_data_frame <- aggregate(poly_data_frame$poly_coef, 
+                               by = list(poly_data_frame$power), 
+                               FUN = sum)
+  colnames(poly_data_frame) <- c("power", "poly_coef")
+  
+  return(new("poly", 
+             data = poly_data_frame))
+}
+
+```
+
+The `show` method of `poly` class:
+
+```{r}
+#| code-fold: show
+#| code-summary: "Show"
+#| warning: true
+#| error: true
+
+#' The `show` method of class `poly`.
+#' 
+#' It will print a sting showing the polynomial expression.
+#'
+#' @param object a `poly` object.
+#'
+#' @return the input `poly` object.
+setMethod("show", "poly", function(object) {
+  # Sort the terms according to power.
+  poly_sorted <- object@data[order(object@data$power, decreasing = TRUE), ]
+  
+  # Suppress the terms with coefficients of 0.
+  if (any(poly_sorted$poly_coef == 0)) {
+    poly_sorted <- poly_sorted[-which(poly_sorted$poly_coef == 0), ]
+  }
+  
+  # Transfer powers and coefficients to string.
+  poly_sorted_power_str <- as.character(poly_sorted$power)
+  poly_sorted_abs_coef_str <- as.character(abs(poly_sorted$poly_coef))
+  
+  # Hide the coefficients whose values are 1.
+  if ("1" %in% poly_sorted_abs_coef_str) {
+    poly_sorted_abs_coef_str[which(poly_sorted_abs_coef_str %in% "1")] <- ""
+  }
+  # Get the sign of coefficients.
+  poly_sorted_coef_sign_str <- ifelse(poly_sorted$poly_coef >= 0, "+", "-")
+  
+  # Create the output string.
+  sign_abs_coef_str <- paste(poly_sorted_coef_sign_str, poly_sorted_abs_coef_str)
+  output_str <- paste(sign_abs_coef_str, poly_sorted_power_str, 
+                      sep = "x^", collapse = " ")
+  # Reduce `x^0` to 1.
+  output_str <- gsub("x\\^0", "", output_str)
+  # Reduce `x^1` to `x`.
+  output_str <- gsub("x\\^1", "x", output_str)
+  # If the output string begins with `+`, we hide this plus sign.
+  if (substr(output_str, 1, 1) == "+") {
+    output_str <- substr(output_str, 3, nchar(output_str))
+  }
+  # Print the string.
+  cat(output_str, "\n")
+  return(invisible(object))
+})
+```
+
+In the following code, we define the addition and subtraction for the `poly` class.
+
+```{r}
+#| code-fold: show
+#| code-summary: "Addition and Subtraction"
+#| warning: true
+#| error: true
+
+#' The addition method of `poly` class.
+#'
+#' It calculate the addition of two polynomial expressions.
+#'
+#' @param e1 the LHS `poly` object.
+#' @param e2 the RHS `poly` object.
+#'
+#' @return the `poly` object of `e1` + `e2`
+setMethod("+", signature(e1 = "poly", e2 = "poly"),
+          function(e1, e2) {
+            # Get the `data.frame` of `e1` and `e2`.
+            e1_df <- e1@data
+            e2_df <- e2@data
+            
+            # Merge the `data.frame` by power.
+            output_df <- merge(e1_df, e2_df, by = "power", 
+                               all = TRUE)
+            # Change NA to 0.
+            output_df$poly_coef.x <- ifelse(is.na(output_df$poly_coef.x), 
+                                            0, output_df$poly_coef.x)
+            output_df$poly_coef.y <- ifelse(is.na(output_df$poly_coef.y), 
+                                            0, output_df$poly_coef.y)
+            
+            # Conduct addition.
+            output_df$poly_coef <- output_df$poly_coef.x + output_df$poly_coef.y
+            
+            # Delete useless columns.
+            output_df$poly_coef.x <- NULL
+            output_df$poly_coef.y <- NULL
+            
+            # Create a new `poly` object.
+            return(new("poly", data = output_df))
+          })
+
+
+#' The subtraction method of `poly` class.
+#'
+#' It calculate the subtraction of two polynomial expressions.
+#'
+#' @param e1 the LHS `poly` object.
+#' @param e2 the RHS `poly` object.
+#'
+#' @return the `poly` object of `e1` - `e2`
+setMethod("-", signature(e1 = "poly", e2 = "poly"),
+          function(e1, e2) {
+            # Get the `data.frame` of `e1` and `e2`.
+            e1_df <- e1@data
+            e2_df <- e2@data
+            
+            # Merge the `data.frame` by power.
+            output_df <- merge(e1_df, e2_df, by = "power", 
+                               all = TRUE)
+            
+            # Change NA to 0.
+            output_df$poly_coef.x <- ifelse(is.na(output_df$poly_coef.x), 
+                                            0, output_df$poly_coef.x)
+            output_df$poly_coef.y <- ifelse(is.na(output_df$poly_coef.y), 
+                                            0, output_df$poly_coef.y)
+            
+            # Conduct subtraction.
+            output_df$poly_coef <- output_df$poly_coef.x - output_df$poly_coef.y
+            
+            # Delete useless columns.
+            output_df$poly_coef.x <- NULL
+            output_df$poly_coef.y <- NULL
+            
+            # Create a new `poly` object.
+            return(new("poly", data = output_df))
+          })
+```
+
+### b
+
+We first conduct some basic tests and then test some special cases to show that our work can earn extra credit.
+
+The basic tests:
+
+```{r}
+#| code-fold: show
+#| code-summary: "Basic tests"
+#| warning: true
+#| error: true
+
+p1 <- make_poly(c(x2 = 3, intercept = 2))
+p2 <- make_poly(c(x3 = 7, x2 = -2, x = -1, intercept = 17))
+p1
+p2
+p1 + p2
+p1 - p2
+```
+
+For **extra credit** (reducing $x^1$ and $x^0$ to $x$ and $1$ as appropriate):
+
+```{r}
+#| code-fold: show
+#| code-summary: "Extra credit (1)"
+#| warning: true
+#| error: true
+
+p3 <- make_poly(c(x1 = 2, x0 = 3))
+p3
+
+```
+
+For **extra credit** (suppressing terms with coefficients of 0):
+
+```{r}
+#| code-fold: show
+#| code-summary: "Extra credit (2)"
+#| warning: true
+#| error: true
+
+p4 <- make_poly(c(x1 = 0, x2 = 3))
+p4
+
+```
+
+For **extra credit** (supporting negative and non-integer exponents):
+
+```{r}
+#| code-fold: show
+#| code-summary: "Extra credit (3)"
+#| warning: true
+#| error: true
+
+p5 <- make_poly(c("x-1" = 1, "x-2.3" = 3))
+p5
+
+```
+
+## Problem 3 - `data.table`
+
+### a
+
+We generate two tables. One reports the mean and median departure delay per airport. Another shows the mean and median arrival delay per airport.
+
+```{r}
+#| code-fold: true
+#| code-summary: "Preparation"
+#| warning: false
+#| error: true
+
+rm(list = ls())
+
+library(data.table)
+library(nycflights13)
+
+data("flights")
+data("airports")
+data("planes")
+
+flights <- as.data.table(flights)
+airports <- as.data.table(airports)
+planes <- as.data.table(planes)
+
+```
+
+The following table shows the mean and median departure delay per airport.
+
+```{r}
+#| code-fold: show
+#| code-summary: "The mean and median departure delay"
+#| warning: true
+#| error: true
+
+dep_mean_med <- flights[, .(mean_delay = mean(dep_delay, na.rm = TRUE),
+                              med_delay = median(dep_delay, na.rm = TRUE),
+                              numflights = .N), by = origin] |>
+                    _[numflights >= 10, ] |> 
+                    setnames(x = _, old = "origin", new = "faa") |>
+                    merge(x = _, y = airports, by = "faa", all.x = TRUE) |>
+                    _[order(-mean_delay), .(name, mean_delay, med_delay)]
+
+print(dep_mean_med, n = nrow(dep_mean_med))
+
+```
+
+The following table shows the mean and median arrival delay per airport.
+
+```{r}
+#| code-fold: show
+#| code-summary: "The mean and median arrival delay"
+#| warning: true
+#| error: true
+
+coalesce <- function(x, y) {
+  return(ifelse(!is.na(x), x, y))
+}
+
+arr_mean_med <- flights[, .(mean_delay = mean(arr_delay, na.rm = TRUE),
+                              med_delay = median(arr_delay, na.rm = TRUE),
+                              numflights = .N), by = dest] |>
+                    _[numflights >= 10, ] |>
+                    setnames(x = _, old = "dest", new = "faa") |>
+                    merge(x = _, y = airports, by = "faa", all.x = TRUE) |>
+                    _[, name := coalesce(name, faa)] |>
+                    _[order(-mean_delay), .(name, mean_delay, med_delay)]
+  
+print(arr_mean_med, n = nrow(arr_mean_med))
+```
+
+### b
+
+We find that 777-222 has the fastest average speed and it takes 4 flights.
+
+```{r}
+#| code-fold: show
+#| code-summary: "The fastest model"
+#| warning: true
+#| error: true
+
+fastest_model <- merge(flights, planes, by = "tailnum", all.x = TRUE) |>
+  _[, time := air_time / 60] |>
+  _[, mph := distance / time] |>
+  _[, .(avgmph = mean(mph, na.rm = TRUE),
+        numflights = .N), by = model] |>
+  _[order(-avgmph), ] |>
+  _[1, ]
+
+fastest_model
+```
